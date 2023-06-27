@@ -1,4 +1,4 @@
-![ORC Banner](https://github.com/DarkArtistry/open-richman-co-pilot/blob/main/public/LianShangK_A_majestic_Hulk_Ninja_mode_with_a_japanese_demon_mas_076621fc-2754-4d73-b2d8-9456b0e84043.png?raw=true)
+![Valahd Banner](https://github.com/DarkArtistry/valahd/blob/main/public/rainbow_unicorn.png?raw=true)
 
 # Valahd
 
@@ -8,7 +8,7 @@ Funded by Amanda from Top-Value, Valahd operates locally on your machine, provid
 
 ## Live Website
 
-Valahd is live and can be accessed at [https://open-richman-co-pilot.web.app/](https://open-richman-co-pilot.web.app/).
+Valahd is live and can be accessed at [https://valahd-9e3a8.web.app](https://valahd-9e3a8.web.app).
 
 ## How To Use
 
