@@ -294,13 +294,15 @@ export default function Portfolio() {
             let eachMarketDataModified = eachMarketData
             eachMarketDataModified['circulating_supply_percentage'] = eachMarketDataModified['circulating_supply'] / eachMarketDataModified['total_supply']
             tempData[eachMarketData.id] = {...defilLamaGecoMap[eachMarketData.id], ...eachMarketData }
-
+            console.log('defilLamaGecoMap[eachMarketData.id]: ', defilLamaGecoMap[eachMarketData.id]);
             // Fetch historical TVL from DefilLama
-            const defilLamaTvlResponse = await fetch(`https://api.llama.fi/v2/historicalChainTvl/${defilLamaGecoMap[eachMarketData.id]['deFilLamaName']}`);
-            const defilLamaTvlData = await defilLamaTvlResponse.json();
-
-            tempData[eachMarketData.id]['defillama_tvl'] = defilLamaTvlData
-            eachMarketData['defillama_tvl'] = defilLamaTvlData
+            if (defilLamaGecoMap[eachMarketData.id]) {
+                const defilLamaTvlResponse = await fetch(`https://api.llama.fi/v2/historicalChainTvl/${defilLamaGecoMap[eachMarketData.id]['deFilLamaName']}`);
+                const defilLamaTvlData = await defilLamaTvlResponse.json();
+    
+                tempData[eachMarketData.id]['defillama_tvl'] = defilLamaTvlData
+                eachMarketData['defillama_tvl'] = defilLamaTvlData
+            }
             return eachMarketData
         }))
         setUnicornData(tempData)
@@ -308,6 +310,7 @@ export default function Portfolio() {
     }
 
     const coinGeckoRefresher = async () => {
+        if (!dataGridRows && dataGridRows.length) return;
         for(let i = 0; i < timeoutIds.length; i++) {
             clearTimeout(timeoutIds[i]);
         }
@@ -315,40 +318,42 @@ export default function Portfolio() {
         let setPriceData = true
         let dataGridRowsWithCommunityData = []
         let dataGridRowsWithCommunityAndPriceData = []
-        try {
-            dataGridRowsWithCommunityData = await Promise.all(dataGridRows.map(async(eachRow) => {
-                if (!eachRow['setCommunityData']) {
-                    const cgCommResponse = await fetch(`https://api.coingecko.com/api/v3/coins/${eachRow.id}?tickers=false&market_data=false&community_data=true&developer_data=false&sparkline=false`)
-                    const cgCommData = await cgCommResponse.json();
-                    console.log('cgCommData: ', cgCommData);
-                    eachRow['community_data'] = cgCommData['community_data'];
-                    eachRow['setCommunityData'] = true;
+        dataGridRowsWithCommunityData = await Promise.all(dataGridRows.map(async(eachRow) => {
+                try {
+                    if (!eachRow['setCommunityData']) {
+                        const cgCommResponse = await fetch(`https://api.coingecko.com/api/v3/coins/${eachRow.id}?tickers=false&market_data=false&community_data=true&developer_data=false&sparkline=false`)
+                        const cgCommData = await cgCommResponse.json();
+                        console.log('cgCommData: ', cgCommData);
+                        eachRow['community_data'] = cgCommData['community_data'];
+                        eachRow['setCommunityData'] = true;
+                    }
+                    return eachRow;
+                } catch (e) {
+                    console.log('Error commdata : ',e);
+                    setCommunityData = false;
+                    return eachRow
                 }
-                return eachRow;
-            }))
-        } catch (e) {
-            console.log('Error commdata : ',e);
-            setCommunityData = false;
-        }
+        }))
 
         console.log("dataGridRowsWithCommunityData : ", dataGridRowsWithCommunityData);
 
-        try {
-            dataGridRowsWithCommunityAndPriceData = await Promise.all(dataGridRowsWithCommunityData.map(async(eachRow) => {
-                if (!eachRow['setPriceData']) {
-                    const cgPriceResponse = await fetch(`https://api.coingecko.com/api/v3/coins/${eachRow.id}/market_chart?vs_currency=${selectedBenchmarkCurrencies}&days=max&interval=daily&precision=18`)
-                    const cgPriceData = await cgPriceResponse.json();
-                    console.log('cgPriceDataL: ', cgPriceData);
-                    eachRow['historic_prices'] = cgPriceData['prices'];
-                    eachRow['historic_volumes'] = cgPriceData['total_volumes'];
-                    eachRow['setPriceData'] = true;
+        dataGridRowsWithCommunityAndPriceData = await Promise.all(dataGridRowsWithCommunityData.map(async(eachRow) => {
+                try {
+                    if (!eachRow['setPriceData']) {
+                        const cgPriceResponse = await fetch(`https://api.coingecko.com/api/v3/coins/${eachRow.id}/market_chart?vs_currency=${selectedBenchmarkCurrencies}&days=max&interval=daily&precision=18`)
+                        const cgPriceData = await cgPriceResponse.json();
+                        console.log('cgPriceDataL: ', cgPriceData);
+                        eachRow['historic_prices'] = cgPriceData['prices'];
+                        eachRow['historic_volumes'] = cgPriceData['total_volumes'];
+                        eachRow['setPriceData'] = true;
+                    }
+                    return eachRow;
+                } catch (e) {
+                    console.log('Error price data : ',e);
+                    setPriceData = false;
+                    return eachRow
                 }
-                return eachRow;
             }))
-        } catch (e) {
-            console.log('Error price data : ',e);
-            setPriceData = false;
-        }
 
         console.log("dataGridRowsWithCommunityAndPriceData : ", dataGridRowsWithCommunityAndPriceData);
 
@@ -416,6 +421,7 @@ export default function Portfolio() {
                 let valueArr = [];
                 datetimePrice.map((eachData, index) => {
                     if (index % 7 != 0) return
+                    if (eachData.length < 2) return
                     console.log("eachData : ", eachData);
                     // push value
                     valueArr.push(eachData[1]);
@@ -424,6 +430,9 @@ export default function Portfolio() {
                     // push !
                     dateArr.push(dateObject)
                 })
+                console.log('historic_prices');
+                console.log('dateArr : ', dateArr);
+                console.log('valueArr : ', valueArr);
                 return (
                     <LineChart
                     sx={{
@@ -445,7 +454,7 @@ export default function Portfolio() {
                             display: 'none',
                         }
                     }}
-                    key={params.row.id}
+                    key={(params.row && params.row.id) || index}
                     xAxis={[{ data: dateArr }]}
                     series={[
                         {
@@ -462,13 +471,14 @@ export default function Portfolio() {
             field: "historic_volumes",
             width: 200,
             renderCell: (params) => {
-                let datetimePrice = (params && params.row && params.row.historic_volumes) || []
-                console.log('datetimePrice: ', datetimePrice);
-                if (!datetimePrice.length) return ''
+                let datetimeVolume = (params && params.row && params.row.historic_volumes) || []
+                console.log('datetimeVolume: ', datetimeVolume);
+                if (!datetimeVolume.length) return ''
                 let dateArr = [];
                 let valueArr = [];
-                datetimePrice.map((eachData, index) => {
+                datetimeVolume.map((eachData, index) => {
                     if (index % 7 != 0) return
+                    if (eachData.length < 2) return
                     console.log("eachData : ", eachData);
                     // push value
                     valueArr.push(eachData[1]);
@@ -477,6 +487,9 @@ export default function Portfolio() {
                     // push !
                     dateArr.push(dateObject)
                 })
+                console.log('historic_volumes');
+                console.log('dateArr : ', dateArr);
+                console.log('valueArr : ', valueArr);
                 return (
                     <LineChart
                     sx={{
@@ -498,11 +511,11 @@ export default function Portfolio() {
                             display: 'none',
                         }
                     }}
-                    key={params.row.id}
+                    key={(params.row && params.row.id) || index}
                     xAxis={[{ data: dateArr }]}
                     series={[
                         {
-                        data: valueArr,
+                            data: valueArr,
                         },
                     ]}
                     width={200}
@@ -559,6 +572,7 @@ export default function Portfolio() {
             renderCell: (params) => {
                 console.log("renderCell params :", params);
                 let datetimeTvl = (params && params.row && params.row.defillama_tvl) || []
+                if (!datetimeTvl.length) return ''
                 let dateArr = [];
                 let valueArr = [];
                 datetimeTvl.map((eachData, index) => {
@@ -577,6 +591,9 @@ export default function Portfolio() {
                     // push !
                     dateArr.push(dateObject)
                 })
+                console.log('defillama_tvl');
+                console.log('dateArr : ', dateArr);
+                console.log('valueArr : ', valueArr);
                 return (
                     <LineChart
                     sx={{
@@ -845,28 +862,6 @@ export default function Portfolio() {
             <br/><br/>
             {geckoCoinList.length === 0 && <Button variant="contained" fullWidth onClick={handleCoinGeckoRequest}>CoinGecko Rate Limit Exceeded. Click this button after 1 minute.</Button>}
             {geckoCoinList.length > 0 && <Button ref={buttonRef} variant="contained" fullWidth onClick={handleFetchMarketData}>Fetch Market Data</Button>}
-            {/* <StyledSelect
-                labelId="geco-coin-list-label"
-                id="mutiple-geco-coin-list"
-                multiple
-                label="Select Cryptocurrencies"
-                value={selectedGeckoCoinList}
-                onChange={handleCoinSelect}
-                fullWidth
-            >
-                <MenuItem key={'empty'} value={null}>
-                    Clear Selections
-                </MenuItem>
-                {geckoCoinList.map((coin) => (
-                <MenuItem key={coin.id} value={coin}>
-                    {coin && coin.symbol && coin.symbol.toUpperCase()} - {coin && coin.name && coin.name.toUpperCase()}
-                </MenuItem>
-                ))}
-            </StyledSelect> */}
-        {/* {JSON.stringify(selectedBenchmarkCurrencies)}
-        {JSON.stringify(selectedGeckoCoinList)}
-        {geckoCoinList.length}
-        {JSON.stringify(unicornData)} */}
         <br/><br/>
         {
             dataGridRows && dataGridRows.length && <Box sx={{ height: 500, width: '100%' }}>
@@ -884,59 +879,6 @@ export default function Portfolio() {
             />
         </Box>
         }
-        {/* {geckoCoinList.length && <DataEditor getCellContent={getContent} columns={columns} rows={selectedGeckoCoinList.length} theme={theme}/>} */}
-        {/* {
-        dataGridRows && dataGridRows.length && dataGridRows.map((eachRow) => {
-            let datetimeTvl = (eachRow && eachRow.defillama_tvl) || []
-            let dateArr = [];
-            let valueArr = [];
-            datetimeTvl.map((eachData, index) => {
-                if (index % 7 !== 0) return;
-                // push value
-                valueArr.push((parseFloat(eachData.tvl)));
-                // push date
-                let dateObject = new Date(eachData.date * 1000); 
-                let date = dateObject.getDate();
-                let month = dateObject.getMonth() + 1; // getMonth() returns months from 0-11, so +1 to get the actual month
-                let year = dateObject.getFullYear();
-                // add leading zeros to date and month if they are less than 10
-                if(date < 10) date = '0' + date;
-                if(month < 10) month = '0' + month;
-                let localDate = `${date}/${month}/${year}`;
-                // push !
-                dateArr.push(dateObject)
-            })
-
-            console.log('valueArr : ', valueArr);
-            console.log('dateArr : ', dateArr);
-            return (
-                <LineChart
-                    sx={{
-                        '& .MuiMarkElement-root': {
-                            display: 'none',
-                        },
-                        '& .MuiChartsAxis-tickLabel': {
-                            display: 'none',
-                        },
-                        '& .MuiChartsAxis-line': {
-                            display: 'none',
-                        },
-                        '& .MuiChartsAxis-tickContainer': {
-                            display: 'none',
-                        }
-                    }}
-                    key={eachRow.id}
-                    xAxis={[{ data: dateArr }]}
-                    series={[
-                        {
-                        data: valueArr,
-                        },
-                    ]}
-                    width={200}
-                    height={200}
-                />)
-        })
-        } */}
     </div>
   );
 }
