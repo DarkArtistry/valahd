@@ -30,7 +30,11 @@ export default function Introduction() {
         </Typography>
         <br/><br/>
         <Typography variant="body1" gutterBottom>
-          Funded by Amanda from Top-Value, Valahd operates locally on your machine, providing user control over data and privacy. It offers a range of and datas for all investment levels, and its open-source nature encourages community contributions. Amanda&apos;s generous funding has been pivotal in bringing this tool to the public.
+          The color theme of Valahd is inspired by the vibrant hues of the unicorn emoji. This symbol of magic and wonder encapsulates the vision of Valahd - to create a tool that feels both exciting and intuitive, turning the often complex world of investment portfolio analysis into a delightful and empowering experience. With its playful yet sophisticated design, Valahd invites users to explore their data in a new light, offering a unique blend of functionality and aesthetics.
+        </Typography>
+        <br/><br/>
+        <Typography variant="body1" gutterBottom>
+          Funded by Amanda and Kim from Top-Value, Valahd operates locally on your machine, providing user control over data and privacy. It offers a range of and datas for all investment levels, and its open-source nature encourages community contributions. Amanda&apos;s and Kim&apos;s generous funding has been pivotal in bringing this tool to the public.
         </Typography>
         <br/><br/>
         <Typography variant="body1" gutterBottom>

@@ -154,7 +154,7 @@ export default function Portfolio() {
         .then(data => {
             // Sort data by symbol
             data.sort((a, b) => a.localeCompare(b));
-            console.log("data: ", data);
+            // console.log("data: ", data);
             setGeckoVsCurrencies(data)
         })
         .catch(error => console.error('Error:', error));
@@ -164,7 +164,7 @@ export default function Portfolio() {
         .then(data => {
             // Sort data by symbol
             data.sort((a, b) => a.name.localeCompare(b.name));
-            console.log("data: ", data);
+            // console.log("data: ", data);
             // let data = data.map((eachData) => eachData.)
             setGeckoCoinList(data)
         })
@@ -183,7 +183,7 @@ export default function Portfolio() {
         const bytes  = CryptoJS.AES.decrypt(encryptedState, secretKey);
         const originalState = JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
 
-        console.log("originalState: \n", originalState);
+        // console.log("originalState: \n", originalState);
         // Now you can use originalState object to import your state.
         setDataGridRows(originalState.dataGridRows);
         setSelectedGeckoCoinList(originalState.selectedGeckoCoinList);
@@ -226,7 +226,7 @@ export default function Portfolio() {
         });
         const encryptedState = CryptoJS.AES.encrypt(stateAsString, secretKey).toString();
         // Now you can use encryptedState string to export your state.
-        console.log(encryptedState);
+        // console.log(encryptedState);
 
         // Create a Blob with the encrypted data
         let blob = new Blob([encryptedState], {type: "text/plain;charset=utf-8"});
@@ -275,7 +275,7 @@ export default function Portfolio() {
         // CoinGecko Set Up
         const coinGeckoMarketDataResponse = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=${selectedBenchmarkCurrencies}&ids=${selectedCryptoIds.join("%2C")}&order=market_cap_asc&per_page=250&page=1&sparkline=false&price_change_percentage=1h%2C24h%2C7d%2C14d%2C30d%2C200d%2C1y&locale=en&precision=18`)
         const coinGeckoMarketData = await coinGeckoMarketDataResponse.json();
-        // DefilLama Set Up
+        // DefilLama Set Up for Chains
         const defilLamaChainsResponse = await fetch(`https://api.llama.fi/v2/chains`);
         const defilLamaChainsData = await defilLamaChainsResponse.json();
         const defilLamaGecoMap = {}
@@ -289,19 +289,47 @@ export default function Portfolio() {
                 chainId: eachCoin.chainId, 
             };
         })
+
+        // DefilLama Set Up for Protocols
+        const defilLamaProtocolsResponse = await fetch(`https://api.llama.fi/protocols`);
+        const defilLamaProtocolsData = await defilLamaProtocolsResponse.json();
+        console.log('defilLamaGecoMap: ', defilLamaGecoMap);
+        defilLamaProtocolsData.map((eachCoin)=> {
+            if (eachCoin.gecko_id) {
+                defilLamaGecoMap[eachCoin.gecko_id] = { ...defilLamaGecoMap[eachCoin.gecko_id], isProtocol: true, defiLamaProtocolSlug: eachCoin.slug };
+            }
+        })
+
         let tempData = {}
         let newDataGridRows = await Promise.all(coinGeckoMarketData.map(async (eachMarketData) => {
             let eachMarketDataModified = eachMarketData
             eachMarketDataModified['circulating_supply_percentage'] = eachMarketDataModified['circulating_supply'] / eachMarketDataModified['total_supply']
             tempData[eachMarketData.id] = {...defilLamaGecoMap[eachMarketData.id], ...eachMarketData }
-            console.log('defilLamaGecoMap[eachMarketData.id]: ', defilLamaGecoMap[eachMarketData.id]);
+            // console.log('defilLamaGecoMap[eachMarketData.id]: ', defilLamaGecoMap[eachMarketData.id]);
             // Fetch historical TVL from DefilLama
+            console.log(defilLamaGecoMap[eachMarketData.id]);
             if (defilLamaGecoMap[eachMarketData.id]) {
-                const defilLamaTvlResponse = await fetch(`https://api.llama.fi/v2/historicalChainTvl/${defilLamaGecoMap[eachMarketData.id]['deFilLamaName']}`);
-                const defilLamaTvlData = await defilLamaTvlResponse.json();
-    
-                tempData[eachMarketData.id]['defillama_tvl'] = defilLamaTvlData
-                eachMarketData['defillama_tvl'] = defilLamaTvlData
+                if (defilLamaGecoMap[eachMarketData.id] && defilLamaGecoMap[eachMarketData.id]['isProtocol']) {
+                    console.log('defilLamaGecoMap[eachMarketData.id]["slug"]: ', defilLamaGecoMap[eachMarketData.id]['defiLamaProtocolSlug']);
+                    const defilLamaTvlResponse = await fetch(`https://api.llama.fi/protocol/${defilLamaGecoMap[eachMarketData.id]['defiLamaProtocolSlug']}`);
+                    const defilLamaTvlData = await defilLamaTvlResponse.json();
+                    
+                    console.log(" defilLamaTvlData protocol : ", defilLamaTvlData);
+                    let DefiProtocolNewStruct = defilLamaTvlData['tvl'].map((eachTvlData) => {
+                        return {
+                            date: ((eachTvlData && eachTvlData.date) || 0),
+                            tvl: ((eachTvlData && eachTvlData.totalLiquidityUSD) || 0)
+                        }
+                    })
+                    tempData[eachMarketData.id]['defillama_tvl'] = DefiProtocolNewStruct
+                    eachMarketData['defillama_tvl'] = DefiProtocolNewStruct
+                } else {
+                    const defilLamaTvlResponse = await fetch(`https://api.llama.fi/v2/historicalChainTvl/${defilLamaGecoMap[eachMarketData.id]['deFilLamaName']}`);
+                    const defilLamaTvlData = await defilLamaTvlResponse.json();
+        
+                    tempData[eachMarketData.id]['defillama_tvl'] = defilLamaTvlData
+                    eachMarketData['defillama_tvl'] = defilLamaTvlData
+                }
             }
             return eachMarketData
         }))
@@ -323,39 +351,39 @@ export default function Portfolio() {
                     if (!eachRow['setCommunityData']) {
                         const cgCommResponse = await fetch(`https://api.coingecko.com/api/v3/coins/${eachRow.id}?tickers=false&market_data=false&community_data=true&developer_data=false&sparkline=false`)
                         const cgCommData = await cgCommResponse.json();
-                        console.log('cgCommData: ', cgCommData);
+                        // console.log('cgCommData: ', cgCommData);
                         eachRow['community_data'] = cgCommData['community_data'];
                         eachRow['setCommunityData'] = true;
                     }
                     return eachRow;
                 } catch (e) {
-                    console.log('Error commdata : ',e);
+                    // console.log('Error commdata : ',e);
                     setCommunityData = false;
                     return eachRow
                 }
         }))
 
-        console.log("dataGridRowsWithCommunityData : ", dataGridRowsWithCommunityData);
+        // console.log("dataGridRowsWithCommunityData : ", dataGridRowsWithCommunityData);
 
         dataGridRowsWithCommunityAndPriceData = await Promise.all(dataGridRowsWithCommunityData.map(async(eachRow) => {
                 try {
                     if (!eachRow['setPriceData']) {
                         const cgPriceResponse = await fetch(`https://api.coingecko.com/api/v3/coins/${eachRow.id}/market_chart?vs_currency=${selectedBenchmarkCurrencies}&days=max&interval=daily&precision=18`)
                         const cgPriceData = await cgPriceResponse.json();
-                        console.log('cgPriceDataL: ', cgPriceData);
+                        // console.log('cgPriceDataL: ', cgPriceData);
                         eachRow['historic_prices'] = cgPriceData['prices'];
                         eachRow['historic_volumes'] = cgPriceData['total_volumes'];
                         eachRow['setPriceData'] = true;
                     }
                     return eachRow;
                 } catch (e) {
-                    console.log('Error price data : ',e);
+                    // console.log('Error price data : ',e);
                     setPriceData = false;
                     return eachRow
                 }
             }))
 
-        console.log("dataGridRowsWithCommunityAndPriceData : ", dataGridRowsWithCommunityAndPriceData);
+        // console.log("dataGridRowsWithCommunityAndPriceData : ", dataGridRowsWithCommunityAndPriceData);
 
         if (!setPriceData || !setCommunityData) {
             let timeoutId = setTimeout(() => {
@@ -405,7 +433,7 @@ export default function Portfolio() {
             field: "current_price",
             width: 100,
             renderCell: (params) => {
-                let data = `${selectedBenchmarkCurrencies} ${(params && params.row && params.row.current_price) || ""}`
+                let data = `${selectedBenchmarkCurrencies} ${(params && params.row && params.row.current_price && parseInt(params.row.current_price) && parseInt(params.row.current_price).toLocaleString()) || ""}`
                 return data
             }
         },
@@ -415,14 +443,14 @@ export default function Portfolio() {
             width: 200,
             renderCell: (params) => {
                 let datetimePrice = (params && params.row && params.row.historic_prices) || []
-                console.log('datetimePrice: ', datetimePrice);
+                // console.log('datetimePrice: ', datetimePrice);
                 if (!datetimePrice.length) return ''
                 let dateArr = [];
                 let valueArr = [];
                 datetimePrice.map((eachData, index) => {
                     if (index % 7 != 0) return
                     if (eachData.length < 2) return
-                    console.log("eachData : ", eachData);
+                    // console.log("eachData : ", eachData);
                     // push value
                     valueArr.push(eachData[1]);
                     // push date
@@ -430,9 +458,9 @@ export default function Portfolio() {
                     // push !
                     dateArr.push(dateObject)
                 })
-                console.log('historic_prices');
-                console.log('dateArr : ', dateArr);
-                console.log('valueArr : ', valueArr);
+                // console.log('historic_prices');
+                // console.log('dateArr : ', dateArr);
+                // console.log('valueArr : ', valueArr);
                 return (
                     <LineChart
                     sx={{
@@ -472,14 +500,14 @@ export default function Portfolio() {
             width: 200,
             renderCell: (params) => {
                 let datetimeVolume = (params && params.row && params.row.historic_volumes) || []
-                console.log('datetimeVolume: ', datetimeVolume);
+                // console.log('datetimeVolume: ', datetimeVolume);
                 if (!datetimeVolume.length) return ''
                 let dateArr = [];
                 let valueArr = [];
                 datetimeVolume.map((eachData, index) => {
                     if (index % 7 != 0) return
                     if (eachData.length < 2) return
-                    console.log("eachData : ", eachData);
+                    // console.log("eachData : ", eachData);
                     // push value
                     valueArr.push(eachData[1]);
                     // push date
@@ -487,9 +515,9 @@ export default function Portfolio() {
                     // push !
                     dateArr.push(dateObject)
                 })
-                console.log('historic_volumes');
-                console.log('dateArr : ', dateArr);
-                console.log('valueArr : ', valueArr);
+                // console.log('historic_volumes');
+                // console.log('dateArr : ', dateArr);
+                // console.log('valueArr : ', valueArr);
                 return (
                     <LineChart
                     sx={{
@@ -528,7 +556,7 @@ export default function Portfolio() {
             field: "market_cap",
             width: 120,
             renderCell: (params) => {
-                let data = `${selectedBenchmarkCurrencies} ${(params && params.row && params.row.market_cap) || ""}`
+                let data = `${selectedBenchmarkCurrencies} ${(params && params.row && params.row.market_cap && parseInt(params.row.market_cap) && parseInt(params.row.market_cap).toLocaleString()) || ""}`
                 return data
             }
         },
@@ -542,7 +570,7 @@ export default function Portfolio() {
             field: "fully_diluted_valuation",
             width: 150,
             renderCell: (params) => {
-                let data = `${selectedBenchmarkCurrencies} ${(params && params.row && params.row.fully_diluted_valuation) || ""}`
+                let data = `${selectedBenchmarkCurrencies} ${(params && params.row && params.row.fully_diluted_valuation && parseInt(params.row.fully_diluted_valuation) && parseInt(params.row.fully_diluted_valuation).toLocaleString()) || ""}`
                 return data
             }
         },
@@ -570,7 +598,7 @@ export default function Portfolio() {
             field: "defillama_tvl",
             width: 200,
             renderCell: (params) => {
-                console.log("renderCell params :", params);
+                // console.log("renderCell params :", params);
                 let datetimeTvl = (params && params.row && params.row.defillama_tvl) || []
                 if (!datetimeTvl.length) return ''
                 let dateArr = [];
@@ -591,9 +619,9 @@ export default function Portfolio() {
                     // push !
                     dateArr.push(dateObject)
                 })
-                console.log('defillama_tvl');
-                console.log('dateArr : ', dateArr);
-                console.log('valueArr : ', valueArr);
+                // console.log('defillama_tvl');
+                // console.log('dateArr : ', dateArr);
+                // console.log('valueArr : ', valueArr);
                 return (
                     <LineChart
                     sx={{
@@ -668,7 +696,7 @@ export default function Portfolio() {
             field: "high_24h",
             width: 100,
             renderCell: (params) => {
-                let data = `${selectedBenchmarkCurrencies} ${(params && params.row && params.row.high_24h) || ""}`
+                let data = `${selectedBenchmarkCurrencies} ${(params && params.row && params.row.high_24h && parseInt(params.row.high_24h) && parseInt(params.row.high_24h).toLocaleString()) || ""}`
                 return data
             }
         },
@@ -677,7 +705,7 @@ export default function Portfolio() {
             field: "low_24h",
             width: 100,
             renderCell: (params) => {
-                let data = `${selectedBenchmarkCurrencies} ${(params && params.row && params.row.low_24h) || ""}`
+                let data = `${selectedBenchmarkCurrencies} ${(params && params.row && params.row.low_24h && parseInt(params.row.low_24h) && parseInt(params.row.low_24h).toLocaleString()) || ""}`
                 return data
             }
         },
@@ -703,7 +731,7 @@ export default function Portfolio() {
             field: "ath",
             width: 200,
             renderCell: (params) => {
-                let data = `${selectedBenchmarkCurrencies} ${(params && params.row && params.row.ath) || ""}`
+                let data = `${selectedBenchmarkCurrencies} ${(params && params.row && params.row.ath && parseInt(params.row.ath) && parseInt(params.row.ath).toLocaleString()) || ""}`
                 return data
             }
         },
@@ -726,7 +754,7 @@ export default function Portfolio() {
             field: "atl",
             width: 200,
             renderCell: (params) => {
-                let data = `${selectedBenchmarkCurrencies} ${(params && params.row && params.row.atl) || ""}`
+                let data = `${selectedBenchmarkCurrencies} ${(params && params.row && params.row.atl && parseInt(params.row.atl) && parseInt(params.row.atl).toLocaleString()) || ""}`
                 return data
             }
         },
@@ -809,6 +837,24 @@ export default function Portfolio() {
             Generate Valahd Secret Key
         </Button>
         <br/><br/>
+        <Grid container spacing={3}>
+            <Grid item xs={12}>
+                <StyledTextField
+                    fullWidth
+                    id="secret-key"
+                    label="Secret Key"
+                    type="text"
+                    InputLabelProps={{
+                        shrink: true,
+                    }}
+                    value={secretKey}
+                    onChange={(event) => {
+                        setSecretKey(event.target.value);
+                    }}
+                />
+            </Grid>
+        </Grid>
+        <br/><br/>
         <FormControl fullWidth>
             <InputLabel sx={{color: 'white'}} id="benchmark-currencies-label">Select Benchmark Currencies</InputLabel>
             <StyledSelect
@@ -848,7 +894,7 @@ export default function Portfolio() {
             renderTags={(tagValue, getTagProps) => (
                     tagValue.map((coin, index) => {
                         const { key, ...otherProps } = getTagProps({ index });
-                        console.log("otherProps: ", otherProps);
+                        // console.log("otherProps: ", otherProps);
                         return (
                         <StyledChip
                             key={`${coin.id}-${index}`}
